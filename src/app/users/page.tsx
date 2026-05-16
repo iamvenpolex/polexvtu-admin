@@ -20,7 +20,7 @@ interface User {
   deleted: boolean;
 }
 
-interface EditForm {
+interface EditForm extends Record<string, unknown> {
   first_name: string;
   last_name: string;
   email: string;
