@@ -20,6 +20,7 @@ interface Overview {
   transactions: number;
   revenue: number;
 }
+
 interface IncomeData {
   labels: string[];
   totals: number[];
@@ -33,17 +34,38 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [income, setIncome] = useState<IncomeData | null>(null);
   const [range, setRange] = useState<Range>("day");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([getOverview(), getIncome(range)])
-      .then(([ov, inc]) => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setLoading(true);
+
+      try {
+        const [ov, inc] = await Promise.all([getOverview(), getIncome(range)]);
+
+        if (!isMounted) return;
+
         setOverview(ov.data);
         setIncome(inc.data);
-      })
-      .catch(() => toast("Failed to load analytics", "error"))
-      .finally(() => setLoading(false));
-  }, [range]); // eslint-disable-line
+      } catch {
+        if (isMounted) {
+          toast("Failed to load analytics", "error");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [range, toast]);
 
   const chartData =
     income?.labels.map((label, i) => ({
@@ -79,6 +101,11 @@ export default function DashboardPage() {
       color: "var(--warning)",
     },
   ];
+
+  const tooltipFormatter = (value: unknown): [string, string] => {
+    const num = typeof value === "number" ? value : Number(value ?? 0);
+    return [fmt(Number.isNaN(num) ? 0 : num), "Revenue"];
+  };
 
   return (
     <AdminShell title="Dashboard">
@@ -145,6 +172,7 @@ export default function DashboardPage() {
               }}
             >
               <div className="section-title">Income Overview</div>
+
               <div style={{ display: "flex", gap: 6 }}>
                 {ranges.map((r) => (
                   <button
@@ -158,6 +186,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
+
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart
@@ -174,18 +203,21 @@ export default function DashboardPage() {
                       <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                     </linearGradient>
                   </defs>
+
                   <XAxis
                     dataKey="label"
                     tick={{ fill: "var(--text3)", fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                   />
+
                   <YAxis
                     tick={{ fill: "var(--text3)", fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => "₦" + Number(v).toLocaleString()}
                   />
+
                   <Tooltip
                     contentStyle={{
                       background: "var(--surface2)",
@@ -195,8 +227,9 @@ export default function DashboardPage() {
                     }}
                     labelStyle={{ color: "var(--text2)" }}
                     itemStyle={{ color: "var(--accent)" }}
-                    formatter={(v: number) => [fmt(v), "Revenue"]}
+                    formatter={tooltipFormatter}
                   />
+
                   <Area
                     type="monotone"
                     dataKey="amount"
