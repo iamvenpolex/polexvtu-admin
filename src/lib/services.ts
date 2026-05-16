@@ -52,9 +52,15 @@ export const setCableTVCustomPrice = (
 export const getDataPlans = (productType: string) =>
   api.get(`/api/vtu/plans/${productType}`)
 
+export const getGlobalMarkup = () =>
+  api.get('/api/vtu/global-markup')
+
+export const setGlobalMarkup = (markup: number) =>
+  api.post('/api/vtu/global-markup', { markup })
+
 export const bulkSetDataPrices = (
   product_type: string,
-  plans: { plan_id: string; plan_name: string; custom_price: number; status: string }[]
+  plans: { plan_id: string; plan_name: string; markup: number; status: string }[]
 ) => api.post('/api/vtu/plans/custom-price/bulk', { product_type, plans })
 
 // ── EDUCATION PRICING ─────────────────────────────────────────
