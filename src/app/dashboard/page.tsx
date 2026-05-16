@@ -1,0 +1,217 @@
+"use client";
+import { useEffect, useState } from "react";
+import { AdminShell } from "@/components/layout/AdminShell";
+import { getOverview, getIncome } from "@/lib/services";
+import { fmt } from "@/lib/utils";
+import { ToastContainer } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/useToast";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { Users, ArrowLeftRight, TrendingUp, CreditCard } from "lucide-react";
+
+interface Overview {
+  users: number;
+  transactions: number;
+  revenue: number;
+}
+interface IncomeData {
+  labels: string[];
+  totals: number[];
+}
+
+const ranges = ["day", "week", "month"] as const;
+type Range = (typeof ranges)[number];
+
+export default function DashboardPage() {
+  const { toasts, toast } = useToast();
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [income, setIncome] = useState<IncomeData | null>(null);
+  const [range, setRange] = useState<Range>("day");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([getOverview(), getIncome(range)])
+      .then(([ov, inc]) => {
+        setOverview(ov.data);
+        setIncome(inc.data);
+      })
+      .catch(() => toast("Failed to load analytics", "error"))
+      .finally(() => setLoading(false));
+  }, [range]); // eslint-disable-line
+
+  const chartData =
+    income?.labels.map((label, i) => ({
+      label,
+      amount: income.totals[i],
+    })) || [];
+
+  const stats = [
+    {
+      label: "Total Users",
+      value: overview?.users ?? "—",
+      icon: Users,
+      color: "var(--accent)",
+    },
+    {
+      label: "Transactions",
+      value: overview?.transactions ?? "—",
+      icon: ArrowLeftRight,
+      color: "var(--info)",
+    },
+    {
+      label: "Total Revenue",
+      value: overview ? fmt(overview.revenue) : "—",
+      icon: TrendingUp,
+      color: "var(--success)",
+    },
+    {
+      label: "Avg. Revenue",
+      value: overview
+        ? fmt(overview.revenue / (Number(overview.transactions) || 1))
+        : "—",
+      icon: CreditCard,
+      color: "var(--warning)",
+    },
+  ];
+
+  return (
+    <AdminShell title="Dashboard">
+      <ToastContainer toasts={toasts} />
+
+      {loading ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            color: "var(--text2)",
+            paddingTop: 40,
+          }}
+        >
+          <span className="spin" /> Loading analytics…
+        </div>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+              gap: 14,
+              marginBottom: 28,
+            }}
+          >
+            {stats.map((s) => (
+              <div key={s.label} className="stat-card">
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                  }}
+                >
+                  <div className="stat-label">{s.label}</div>
+                  <s.icon size={18} color={s.color} />
+                </div>
+                <div className="stat-value" style={{ color: s.color }}>
+                  {s.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Income chart */}
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "20px 24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div className="section-title">Income Overview</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {ranges.map((r) => (
+                  <button
+                    key={r}
+                    className="price-tab"
+                    style={{ padding: "5px 14px", fontSize: 12 }}
+                    onClick={() => setRange(r)}
+                  >
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor="#f97316"
+                        stopOpacity={0.25}
+                      />
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: "var(--text3)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "var(--text3)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => "₦" + Number(v).toLocaleString()}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--surface2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 13,
+                    }}
+                    labelStyle={{ color: "var(--text2)" }}
+                    itemStyle={{ color: "var(--accent)" }}
+                    formatter={(v: number) => [fmt(v), "Revenue"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    fill="url(#grad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="empty-state">No income data for this period</div>
+            )}
+          </div>
+        </>
+      )}
+    </AdminShell>
+  );
+}
