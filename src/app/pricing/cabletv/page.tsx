@@ -12,6 +12,7 @@ const COMPANIES = [
   { key: "dstv", label: "DSTV" },
   { key: "gotv", label: "GOtv" },
   { key: "startimes", label: "Startimes" },
+  { key: "showmax", label: "Showmax" },
 ];
 
 export default function CableTVPricingPage() {
