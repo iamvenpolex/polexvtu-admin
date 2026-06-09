@@ -2,7 +2,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Sidebar } from "@/components/layout/Sidebar";
 
 export default function DashboardLayout({
   children,

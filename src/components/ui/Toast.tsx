@@ -17,18 +17,46 @@ export function ToastContainer({ toasts }: { toasts: Toast[] }) {
     <div
       style={{
         position: "fixed",
-        bottom: 24,
-        right: 24,
-        zIndex: 999,
+        bottom: 20,
+        right: 20,
+        left: window.innerWidth <= 768 ? 20 : "auto",
+        zIndex: 9999,
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        gap: 10,
+        pointerEvents: "none",
       }}
     >
       {toasts.map((t) => (
-        <div key={t.id} className={`toast-base toast-${t.type}`}>
-          <span style={{ fontWeight: 600 }}>{icons[t.type]}</span>
-          {t.message}
+        <div
+          key={t.id}
+          className={`toast-base toast-${t.type}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            maxWidth: 350,
+            width: "100%",
+            pointerEvents: "auto",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 700,
+              minWidth: 18,
+            }}
+          >
+            {icons[t.type]}
+          </span>
+
+          <span
+            style={{
+              flex: 1,
+              wordBreak: "break-word",
+            }}
+          >
+            {t.message}
+          </span>
         </div>
       ))}
     </div>
