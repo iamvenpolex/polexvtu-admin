@@ -26,7 +26,6 @@ export default function DashboardLayout({
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      <Sidebar />
       <div
         style={{
           flex: 1,
