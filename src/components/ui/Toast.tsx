@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 interface Toast {
   id: number;
   message: string;
@@ -13,13 +15,26 @@ const icons = {
 };
 
 export function ToastContainer({ toasts }: { toasts: Toast[] }) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    check();
+    window.addEventListener("resize", check);
+
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
     <div
       style={{
         position: "fixed",
         bottom: 20,
         right: 20,
-        left: window.innerWidth <= 768 ? 20 : "auto",
+        left: isMobile ? 20 : "auto",
         zIndex: 9999,
         display: "flex",
         flexDirection: "column",
@@ -40,23 +55,9 @@ export function ToastContainer({ toasts }: { toasts: Toast[] }) {
             pointerEvents: "auto",
           }}
         >
-          <span
-            style={{
-              fontWeight: 700,
-              minWidth: 18,
-            }}
-          >
-            {icons[t.type]}
-          </span>
+          <span style={{ fontWeight: 700, minWidth: 18 }}>{icons[t.type]}</span>
 
-          <span
-            style={{
-              flex: 1,
-              wordBreak: "break-word",
-            }}
-          >
-            {t.message}
-          </span>
+          <span style={{ flex: 1, wordBreak: "break-word" }}>{t.message}</span>
         </div>
       ))}
     </div>

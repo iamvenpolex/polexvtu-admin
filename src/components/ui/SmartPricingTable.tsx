@@ -22,14 +22,10 @@ export function SmartPricingTable({
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkScreen = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
-    checkScreen();
-    window.addEventListener("resize", checkScreen);
-
-    return () => window.removeEventListener("resize", checkScreen);
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   if (loading) {
@@ -40,9 +36,7 @@ export function SmartPricingTable({
     );
   }
 
-  if (!plans.length) {
-    return <div className="empty-state">No plans found</div>;
-  }
+  if (!plans.length) return <div className="empty-state">No plans found</div>;
 
   const getRuleData = (p: Plan) => {
     const rule =
@@ -54,37 +48,17 @@ export function SmartPricingTable({
             ? "global"
             : "none";
 
-    const ruleLabels: Record<string, string> = {
-      fixed: "Fixed",
-      markup: "Markup",
-      global: "Global",
-      none: "Raw",
-    };
-
-    const ruleBadge: Record<string, string> = {
-      fixed: "badge-warn",
-      markup: "badge-info",
-      global: "badge-orange",
-      none: "badge-gray",
-    };
-
     return {
-      label: ruleLabels[rule],
-      badge: ruleBadge[rule],
-    };
+      fixed: { label: "Fixed", badge: "badge-warn" },
+      markup: { label: "Markup", badge: "badge-info" },
+      global: { label: "Global", badge: "badge-orange" },
+      none: { label: "Raw", badge: "badge-gray" },
+    }[rule];
   };
-
-  /* ---------------- MOBILE CARDS ---------------- */
 
   if (isMobile) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {plans.map((p) => {
           const base = p.ea_price ?? p.price ?? 0;
           const final = calcFinal(p, globalMarkup);
@@ -101,97 +75,15 @@ export function SmartPricingTable({
                 padding: 16,
               }}
             >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 15,
-                  marginBottom: 12,
-                }}
-              >
-                {p.name}
-              </div>
+              <div style={{ fontWeight: 700, marginBottom: 12 }}>{p.name}</div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gap: 10,
-                  fontSize: 13,
-                }}
-              >
-                <div>
-                  <strong>Provider Price:</strong> {fmt(base)}
-                </div>
+              <div>Provider: {fmt(base)}</div>
+              <div style={{ color: "var(--accent)" }}>Final: {fmt(final)}</div>
+              <div>Profit: {fmt(profit)}</div>
 
-                <div>
-                  <strong>Final Price:</strong>{" "}
-                  <span style={{ color: "var(--accent)" }}>{fmt(final)}</span>
-                </div>
-
-                <div>
-                  <strong>Profit:</strong>{" "}
-                  <span
-                    style={{
-                      color:
-                        profit > 0
-                          ? "var(--success)"
-                          : profit < 0
-                            ? "var(--danger)"
-                            : "var(--text3)",
-                    }}
-                  >
-                    {profit > 0 ? "+" : ""}
-                    {fmt(profit)}
-                  </span>
-                </div>
-
-                <div>
-                  <strong>Rule:</strong>{" "}
-                  <span className={`badge ${rule.badge}`}>{rule.label}</span>
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Fixed Override
-                  </label>
-
-                  <input
-                    type="number"
-                    className="rule-input"
-                    placeholder="e.g. 106"
-                    min="0"
-                    value={p.fixed_price ?? ""}
-                    onChange={(e) => onSetFixed(p.plan_id, e.target.value)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: 6,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Auto Markup
-                  </label>
-
-                  <input
-                    type="number"
-                    className="rule-input"
-                    placeholder="e.g. 5"
-                    min="0"
-                    value={p.markup ?? ""}
-                    onChange={(e) => onSetMarkup(p.plan_id, e.target.value)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
+              <div>
+                Rule:{" "}
+                <span className={`badge ${rule.badge}`}>{rule.label}</span>
               </div>
             </div>
           );
@@ -200,18 +92,16 @@ export function SmartPricingTable({
     );
   }
 
-  /* ---------------- DESKTOP TABLE ---------------- */
-
   return (
     <div style={{ overflowX: "auto" }}>
       <table>
         <thead>
           <tr>
-            <th>Plan Name</th>
-            <th>Provider Price</th>
-            <th>Fixed Override</th>
-            <th>Auto-Markup</th>
-            <th>Final Price</th>
+            <th>Name</th>
+            <th>Provider</th>
+            <th>Fixed</th>
+            <th>Markup</th>
+            <th>Final</th>
             <th>Profit</th>
             <th>Rule</th>
           </tr>
@@ -226,15 +116,11 @@ export function SmartPricingTable({
 
             return (
               <tr key={p.plan_id}>
-                <td style={{ fontWeight: 500 }}>{p.name}</td>
-
-                <td className="mono">{fmt(base)}</td>
+                <td>{p.name}</td>
+                <td>{fmt(base)}</td>
 
                 <td>
                   <input
-                    type="number"
-                    className="rule-input"
-                    min="0"
                     value={p.fixed_price ?? ""}
                     onChange={(e) => onSetFixed(p.plan_id, e.target.value)}
                   />
@@ -242,36 +128,14 @@ export function SmartPricingTable({
 
                 <td>
                   <input
-                    type="number"
-                    className="rule-input"
-                    min="0"
                     value={p.markup ?? ""}
                     onChange={(e) => onSetMarkup(p.plan_id, e.target.value)}
                   />
                 </td>
 
-                <td
-                  style={{
-                    fontWeight: 600,
-                    color: "var(--accent)",
-                  }}
-                >
-                  {fmt(final)}
-                </td>
+                <td style={{ color: "var(--accent)" }}>{fmt(final)}</td>
 
-                <td
-                  style={{
-                    color:
-                      profit > 0
-                        ? "var(--success)"
-                        : profit < 0
-                          ? "var(--danger)"
-                          : "var(--text3)",
-                  }}
-                >
-                  {profit > 0 ? "+" : ""}
-                  {fmt(profit)}
-                </td>
+                <td>{fmt(profit)}</td>
 
                 <td>
                   <span className={`badge ${rule.badge}`}>{rule.label}</span>
