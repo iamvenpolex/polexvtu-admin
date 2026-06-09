@@ -74,3 +74,19 @@ export const getSMSPrice = () => api.get('/api/sms/current-price')
 
 export const setSMSPrice = (price: number) =>
   api.post('/api/sms/set-price', { price })
+
+// ── DATA PLAN SYNC (Admin) ────────────────────────────────────
+export const getDataPlanStatus = () =>
+  api.get('/api/vtu/admin/plans/status')
+
+export const syncAllDataPlans = () =>
+  api.post('/api/vtu/admin/plans/sync')
+
+export const deleteAllDataPlans = () =>
+  api.delete('/api/vtu/admin/plans/all')
+
+export const deleteSingleDataPlan = (id: number) =>
+  api.delete(`/api/vtu/admin/plans/single/${id}`)
+
+export const toggleDataPlanStatus = (id: number, status: 'active' | 'inactive') =>
+  api.patch(`/api/vtu/admin/plans/${id}/status`, { status })

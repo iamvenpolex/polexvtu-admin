@@ -6,13 +6,15 @@ import {
   bulkSetDataPrices,
   getGlobalMarkup,
   setGlobalMarkup,
+  getDataPlanStatus,
+  syncAllDataPlans,
+  deleteAllDataPlans,
 } from "@/lib/services";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
 import { Save, RefreshCw, Search, Trash2, RotateCcw } from "lucide-react";
 import { fmt } from "@/lib/utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 const MIN_MARGIN = 5;
 
 const PRODUCT_TYPES = [
@@ -68,30 +70,7 @@ export default function DataPricingPage() {
     { synced: number; error?: string }
   > | null>(null);
 
-  // ── Check DB status ──────────────────────────────────────
-  async function checkStatus() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/plans/status`);
-      const data = await res.json();
-      setHasPlans(data.hasPlans);
-      setTotalPlans(data.total);
-    } catch {
-      setHasPlans(false);
-    }
-  }
-
-  useEffect(() => {
-    checkStatus();
-    getGlobalMarkup()
-      .then((res) => {
-        const m = Number(res.data.markup || 0);
-        setGlobalMarkupVal(m);
-        setGlobalInput(String(m));
-      })
-      .catch(() => {});
-  }, []);
-
-  // ── Load plans ───────────────────────────────────────────
+  // ── load: used for manual triggers (Refresh, after Save, after Sync) ──
   const load = async (pt: string) => {
     setLoading(true);
     try {
@@ -110,9 +89,54 @@ export default function DataPricingPage() {
     }
   };
 
+  // ── On mount: check status + load global markup ──────────
   useEffect(() => {
-    load(productType);
-  }, [productType]); // eslint-disable-line
+    const init = async () => {
+      try {
+        const res = await getDataPlanStatus();
+        setHasPlans(res.data.hasPlans);
+        setTotalPlans(res.data.total);
+      } catch {
+        setHasPlans(false);
+      }
+      try {
+        const res = await getGlobalMarkup();
+        const m = Number(res.data.markup || 0);
+        setGlobalMarkupVal(m);
+        setGlobalInput(String(m));
+      } catch {
+        /* non-critical */
+      }
+    };
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Load plans when product type changes ─────────────────
+  useEffect(() => {
+    let cancelled = false;
+    const fetchPlans = async () => {
+      setLoading(true);
+      try {
+        const res = await getDataPlans(productType);
+        if (cancelled) return;
+        const plans: Plan[] = res.data.plans || [];
+        setRows(
+          plans.map((p) => ({
+            ...p,
+            localMarkup: String(p.markup ?? globalMarkup),
+          })),
+        );
+      } catch {
+        if (!cancelled) toast("Failed to load plans", "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchPlans();
+    return () => {
+      cancelled = true;
+    };
+  }, [productType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync all ─────────────────────────────────────────────
   async function handleSync() {
@@ -120,10 +144,8 @@ export default function DataPricingPage() {
     setSyncing(true);
     setSyncSummary(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/plans/sync`, {
-        method: "POST",
-      });
-      const data = await res.json();
+      const res = await syncAllDataPlans();
+      const data = res.data;
       if (data.success) {
         setHasPlans(data.total > 0);
         setTotalPlans(data.total);
@@ -132,12 +154,12 @@ export default function DataPricingPage() {
         toast(
           `Synced ${data.total} plans — all inactive, activate before users can buy`,
         );
-        load(productType);
+        await load(productType);
       } else {
         toast(data.message || "Sync failed", "error");
       }
     } catch {
-      toast("Network error — sync failed", "error");
+      toast("Sync failed", "error");
     } finally {
       setSyncing(false);
     }
@@ -155,10 +177,8 @@ export default function DataPricingPage() {
     setDeleting(true);
     setSyncSummary(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/plans/all`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
+      const res = await deleteAllDataPlans();
+      const data = res.data;
       if (data.success) {
         setHasPlans(false);
         setTotalPlans(0);
@@ -168,7 +188,7 @@ export default function DataPricingPage() {
         toast(data.message || "Delete failed", "error");
       }
     } catch {
-      toast("Network error — delete failed", "error");
+      toast("Delete failed", "error");
     } finally {
       setDeleting(false);
     }
@@ -219,7 +239,7 @@ export default function DataPricingPage() {
       }));
       await bulkSetDataPrices(productType, payload);
       toast("All markups saved successfully");
-      load(productType);
+      await load(productType);
     } catch {
       toast("Failed to save markups", "error");
     } finally {
@@ -378,7 +398,7 @@ export default function DataPricingPage() {
           </p>
         )}
 
-        {/* Sync summary (shown after a sync) */}
+        {/* Sync summary */}
         {syncSummary && (
           <div
             style={{
