@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -14,7 +13,6 @@ import {
   GraduationCap,
   MessageSquare,
   LogOut,
-  Menu,
   X,
 } from "lucide-react";
 
@@ -34,56 +32,24 @@ const navItems = [
   { href: "/pricing/sms", label: "SMS Pricing", icon: MessageSquare },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  open,
+  setOpen,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+}) {
   const pathname = usePathname();
   const { logout } = useAuth();
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkScreen = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
-    checkScreen();
-    window.addEventListener("resize", checkScreen);
-
-    return () => window.removeEventListener("resize", checkScreen);
-  }, []);
-
-  const closeSidebar = () => {
-    if (isMobile) {
-      setIsOpen(false);
-    }
-  };
+  const close = () => setOpen(false);
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      {isMobile && (
-        <button
-          onClick={() => setIsOpen(true)}
-          style={{
-            position: "fixed",
-            top: 16,
-            left: 16,
-            zIndex: 1001,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: 10,
-            cursor: "pointer",
-          }}
-        >
-          <Menu size={20} />
-        </button>
-      )}
-
-      {/* Overlay */}
-      {isMobile && isOpen && (
+      {/* OVERLAY */}
+      {open && (
         <div
-          onClick={() => setIsOpen(false)}
+          onClick={close}
           style={{
             position: "fixed",
             inset: 0,
@@ -101,59 +67,46 @@ export function Sidebar() {
           borderRight: "1px solid var(--border)",
           display: "flex",
           flexDirection: "column",
-          overflowY: "auto",
           height: "100vh",
-
-          position: isMobile ? "fixed" : "sticky",
+          position: "fixed",
           top: 0,
-          left: isMobile ? (isOpen ? 0 : -240) : 0,
+          left: open ? 0 : -240,
           zIndex: 1000,
-
           transition: "left .3s ease",
         }}
       >
-        {/* Logo */}
+        {/* HEADER */}
         <div
           style={{
-            padding: "20px 18px 16px",
-            fontFamily: "Syne, sans-serif",
-            fontSize: 22,
-            fontWeight: 800,
-            color: "var(--accent)",
-            letterSpacing: "-0.5px",
-            borderBottom: "1px solid var(--border)",
+            padding: "20px 18px",
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            borderBottom: "1px solid var(--border)",
+            fontFamily: "Syne",
+            fontWeight: 800,
+            fontSize: 20,
+            color: "var(--accent)",
           }}
         >
           ⬡ Tapam
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 400,
-              color: "var(--text3)",
-              fontFamily: "DM Sans, sans-serif",
-            }}
-          >
+          <span style={{ marginLeft: 6, fontSize: 12, color: "var(--text3)" }}>
             Admin
           </span>
-          {isMobile && (
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{
-                marginLeft: "auto",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-              }}
-            >
-              <X size={20} />
-            </button>
-          )}
+          {/* CLOSE BUTTON */}
+          <button
+            onClick={close}
+            style={{
+              marginLeft: "auto",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Navigation */}
+        {/* NAV */}
         <div style={{ flex: 1, paddingTop: 8 }}>
           {navItems.map((item, i) => {
             if ("section" in item) {
@@ -161,12 +114,11 @@ export function Sidebar() {
                 <div
                   key={i}
                   style={{
-                    padding: "16px 18px 4px",
+                    padding: "14px 18px 4px",
                     fontSize: 10,
                     fontWeight: 600,
                     color: "var(--text3)",
                     textTransform: "uppercase",
-                    letterSpacing: "1.2px",
                   }}
                 >
                   {item.section}
@@ -183,8 +135,17 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={closeSidebar}
-                className={`nav-item${active ? " active" : ""}`}
+                onClick={close}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 18px",
+                  color: active ? "var(--accent)" : "var(--text)",
+                  background: active ? "rgba(0,0,0,0.05)" : "transparent",
+                  textDecoration: "none",
+                  fontSize: 14,
+                }}
               >
                 <Icon size={16} />
                 {item.label}
@@ -193,72 +154,19 @@ export function Sidebar() {
           })}
         </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: 16,
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface2)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "10px 12px",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 10,
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                background: "linear-gradient(135deg,var(--accent),#ec4899)",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-                fontSize: 13,
-                color: "#fff",
-              }}
-            >
-              A
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                }}
-              >
-                Admin
-              </div>
-
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "var(--text3)",
-                }}
-              >
-                admin@tapam.com.ng
-              </div>
-            </div>
-          </div>
-
+        {/* FOOTER */}
+        <div style={{ padding: 16, borderTop: "1px solid var(--border)" }}>
           <button
             onClick={logout}
-            className="btn-ghost"
             style={{
               width: "100%",
               display: "flex",
               alignItems: "center",
-              gap: 8,
               justifyContent: "center",
+              gap: 8,
+              padding: 10,
+              border: "none",
+              cursor: "pointer",
             }}
           >
             <LogOut size={14} />
