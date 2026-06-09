@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -13,18 +12,15 @@ import {
   GraduationCap,
   MessageSquare,
   LogOut,
-  X,
 } from "lucide-react";
 
 const navItems = [
   { section: "Overview" },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-
   { section: "Management" },
   { href: "/users", label: "Users", icon: Users },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/gift-cards", label: "Gift Cards", icon: Gift },
-
   { section: "Pricing" },
   { href: "/pricing/cabletv", label: "Cable TV Prices", icon: Tv },
   { href: "/pricing/data", label: "Data Prices", icon: Wifi },
@@ -32,141 +28,139 @@ const navItems = [
   { href: "/pricing/sms", label: "SMS Pricing", icon: MessageSquare },
 ];
 
-export function Sidebar({
-  open,
-  setOpen,
-  isMobile,
-}: {
-  open: boolean;
-  setOpen: (v: boolean) => void;
-  isMobile: boolean;
-}) {
+export function Sidebar() {
   const pathname = usePathname();
   const { logout } = useAuth();
 
-  const close = () => setOpen(false);
-
   return (
-    <>
-      {/* OVERLAY (MOBILE ONLY) */}
-      {isMobile && open && (
-        <div
-          onClick={close}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,.5)",
-            zIndex: 999,
-          }}
-        />
-      )}
-
-      <nav
+    <nav
+      style={{
+        width: 240,
+        minWidth: 240,
+        background: "var(--surface)",
+        borderRight: "1px solid var(--border)",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+        height: "100vh",
+      }}
+    >
+      {/* Logo */}
+      <div
         style={{
-          width: 240,
-          background: "var(--surface)",
-          borderRight: "1px solid var(--border)",
+          padding: "20px 18px 16px",
+          fontFamily: "Syne, sans-serif",
+          fontSize: 22,
+          fontWeight: 800,
+          color: "var(--accent)",
+          letterSpacing: "-0.5px",
+          borderBottom: "1px solid var(--border)",
           display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-
-          position: isMobile ? "fixed" : "fixed",
-          left: isMobile ? (open ? 0 : -240) : 0,
-          top: 0,
-
-          zIndex: 1000,
-          transition: "left .3s ease",
+          alignItems: "center",
+          gap: 8,
         }}
       >
-        {/* HEADER */}
-        <div
+        ⬡ Tapam
+        <span
           style={{
-            padding: "18px",
-            display: "flex",
-            alignItems: "center",
-            borderBottom: "1px solid var(--border)",
-            fontFamily: "Syne",
-            fontWeight: 800,
-            fontSize: 20,
-            color: "var(--accent)",
+            fontSize: 12,
+            fontWeight: 400,
+            color: "var(--text3)",
+            fontFamily: "DM Sans, sans-serif",
+            letterSpacing: 0,
           }}
         >
-          ⬡ Tapam
-          <span style={{ marginLeft: 6, fontSize: 12, color: "var(--text3)" }}>
-            Admin
-          </span>
-          {isMobile && (
-            <button
-              onClick={close}
-              style={{
-                marginLeft: "auto",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
+          Admin
+        </span>
+      </div>
 
-        {/* NAV */}
-        <div style={{ flex: 1, paddingTop: 8 }}>
-          {navItems.map((item, i) => {
-            if ("section" in item) {
-              return (
-                <div key={i} style={{ padding: "14px 18px 4px", fontSize: 10 }}>
-                  {item.section}
-                </div>
-              );
-            }
-
-            const active =
-              pathname === item.href || pathname.startsWith(item.href);
-
-            const Icon = item.icon;
-
+      {/* Nav */}
+      <div style={{ flex: 1, paddingTop: 8 }}>
+        {navItems.map((item, i) => {
+          if ("section" in item) {
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={close}
+              <div
+                key={i}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 18px",
-                  textDecoration: "none",
-                  color: active ? "var(--accent)" : "var(--text)",
-                  background: active ? "rgba(0,0,0,0.05)" : "transparent",
+                  padding: "16px 18px 4px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "var(--text3)",
+                  textTransform: "uppercase",
+                  letterSpacing: "1.2px",
                 }}
               >
-                <Icon size={16} />
-                {item.label}
-              </Link>
+                {item.section}
+              </div>
             );
-          })}
-        </div>
+          }
+          const active =
+            pathname === item.href || pathname.startsWith(item.href + "/");
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-item${active ? " active" : ""}`}
+            >
+              <Icon size={16} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
 
-        {/* FOOTER */}
-        <div style={{ padding: 16, borderTop: "1px solid var(--border)" }}>
-          <button
-            onClick={logout}
+      {/* Footer */}
+      <div style={{ padding: 16, borderTop: "1px solid var(--border)" }}>
+        <div
+          style={{
+            background: "var(--surface2)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 10,
+          }}
+        >
+          <div
             style={{
-              width: "100%",
+              width: 32,
+              height: 32,
+              background: "linear-gradient(135deg,var(--accent),#ec4899)",
+              borderRadius: "50%",
               display: "flex",
+              alignItems: "center",
               justifyContent: "center",
-              gap: 8,
-              padding: 10,
-              border: "none",
-              cursor: "pointer",
+              fontWeight: 700,
+              fontSize: 13,
+              color: "#fff",
             }}
           >
-            <LogOut size={14} />
-            Sign out
-          </button>
+            A
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>Admin</div>
+            <div style={{ fontSize: 11, color: "var(--text3)" }}>
+              admin@tapam.com.ng
+            </div>
+          </div>
         </div>
-      </nav>
-    </>
+        <button
+          onClick={logout}
+          className="btn-ghost"
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            justifyContent: "center",
+          }}
+        >
+          <LogOut size={14} /> Sign out
+        </button>
+      </div>
+    </nav>
   );
 }

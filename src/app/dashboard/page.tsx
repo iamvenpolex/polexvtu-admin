@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/layout/AdminShell";
 import { getOverview, getIncome } from "@/lib/services";
@@ -32,28 +31,10 @@ type Range = (typeof ranges)[number];
 
 export default function DashboardPage() {
   const { toasts, toast } = useToast();
-
   const [overview, setOverview] = useState<Overview | null>(null);
   const [income, setIncome] = useState<IncomeData | null>(null);
   const [range, setRange] = useState<Range>("day");
   const [loading, setLoading] = useState(false);
-
-  // ✅ SAFE MOBILE STATE (NO SSR CRASH)
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const media = window.matchMedia("(max-width: 768px)");
-
-    const update = () => setIsMobile(media.matches);
-
-    update();
-
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -73,7 +54,9 @@ export default function DashboardPage() {
           toast("Failed to load analytics", "error");
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -129,20 +112,26 @@ export default function DashboardPage() {
       <ToastContainer toasts={toasts} />
 
       {loading ? (
-        <div style={{ display: "flex", gap: 10, paddingTop: 40 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            color: "var(--text2)",
+            paddingTop: 40,
+          }}
+        >
           <span className="spin" /> Loading analytics…
         </div>
       ) : (
         <>
-          {/* STATS */}
+          {/* Stat cards */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile
-                ? "repeat(2, 1fr)"
-                : "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: isMobile ? 10 : 14,
-              marginBottom: isMobile ? 18 : 28,
+              gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+              gap: 14,
+              marginBottom: 28,
             }}
           >
             {stats.map((s) => (
@@ -150,14 +139,14 @@ export default function DashboardPage() {
                 <div
                   style={{
                     display: "flex",
+                    alignItems: "center",
                     justifyContent: "space-between",
-                    marginBottom: 10,
+                    marginBottom: 12,
                   }}
                 >
                   <div className="stat-label">{s.label}</div>
                   <s.icon size={18} color={s.color} />
                 </div>
-
                 <div className="stat-value" style={{ color: s.color }}>
                   {s.value}
                 </div>
@@ -165,23 +154,21 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* CHART */}
+          {/* Income chart */}
           <div
             style={{
               background: "var(--surface)",
               border: "1px solid var(--border)",
               borderRadius: "var(--radius-lg)",
-              padding: isMobile ? 14 : "20px 24px",
+              padding: "20px 24px",
             }}
           >
-            {/* HEADER */}
             <div
               style={{
                 display: "flex",
-                flexDirection: isMobile ? "column" : "row",
+                alignItems: "center",
                 justifyContent: "space-between",
-                gap: 10,
-                marginBottom: 16,
+                marginBottom: 20,
               }}
             >
               <div className="section-title">Income Overview</div>
@@ -191,11 +178,8 @@ export default function DashboardPage() {
                   <button
                     key={r}
                     className="price-tab"
+                    style={{ padding: "5px 14px", fontSize: 12 }}
                     onClick={() => setRange(r)}
-                    style={{
-                      flex: isMobile ? 1 : undefined,
-                      padding: isMobile ? "8px 10px" : "5px 14px",
-                    }}
                   >
                     {r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>
@@ -203,10 +187,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* GRAPH */}
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={isMobile ? 320 : 260}>
-                <AreaChart data={chartData}>
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                >
                   <defs>
                     <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
                       <stop
@@ -237,7 +223,10 @@ export default function DashboardPage() {
                       background: "var(--surface2)",
                       border: "1px solid var(--border)",
                       borderRadius: 8,
+                      fontSize: 13,
                     }}
+                    labelStyle={{ color: "var(--text2)" }}
+                    itemStyle={{ color: "var(--accent)" }}
                     formatter={tooltipFormatter}
                   />
 
