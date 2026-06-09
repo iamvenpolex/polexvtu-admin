@@ -38,18 +38,21 @@ export default function DashboardPage() {
   const [range, setRange] = useState<Range>("day");
   const [loading, setLoading] = useState(false);
 
-  // ✅ SAFE MOBILE DETECTION (NO WINDOW DURING BUILD)
+  // ✅ SAFE MOBILE STATE (NO SSR CRASH)
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const check = () => {
-      setIsMobile(window.matchMedia("(max-width: 768px)").matches);
-    };
+    if (typeof window === "undefined") return;
 
-    check();
+    const media = window.matchMedia("(max-width: 768px)");
 
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    const update = () => setIsMobile(media.matches);
+
+    update();
+
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
   }, []);
 
   useEffect(() => {
@@ -126,26 +129,18 @@ export default function DashboardPage() {
       <ToastContainer toasts={toasts} />
 
       {loading ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            color: "var(--text2)",
-            paddingTop: 40,
-          }}
-        >
+        <div style={{ display: "flex", gap: 10, paddingTop: 40 }}>
           <span className="spin" /> Loading analytics…
         </div>
       ) : (
         <>
-          {/* STAT CARDS */}
+          {/* STATS */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: isMobile
-                ? "repeat(2,1fr)"
-                : "repeat(auto-fit,minmax(180px,1fr))",
+                ? "repeat(2, 1fr)"
+                : "repeat(auto-fit, minmax(180px, 1fr))",
               gap: isMobile ? 10 : 14,
               marginBottom: isMobile ? 18 : 28,
             }}
@@ -191,13 +186,7 @@ export default function DashboardPage() {
             >
               <div className="section-title">Income Overview</div>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  width: isMobile ? "100%" : "auto",
-                }}
-              >
+              <div style={{ display: "flex", gap: 6 }}>
                 {ranges.map((r) => (
                   <button
                     key={r}
@@ -214,7 +203,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* CHART */}
+            {/* GRAPH */}
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={isMobile ? 320 : 260}>
                 <AreaChart data={chartData}>
@@ -231,19 +220,13 @@ export default function DashboardPage() {
 
                   <XAxis
                     dataKey="label"
-                    tick={{
-                      fill: "var(--text3)",
-                      fontSize: isMobile ? 10 : 11,
-                    }}
+                    tick={{ fill: "var(--text3)", fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                   />
 
                   <YAxis
-                    tick={{
-                      fill: "var(--text3)",
-                      fontSize: isMobile ? 10 : 11,
-                    }}
+                    tick={{ fill: "var(--text3)", fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => "₦" + Number(v).toLocaleString()}
@@ -254,10 +237,7 @@ export default function DashboardPage() {
                       background: "var(--surface2)",
                       border: "1px solid var(--border)",
                       borderRadius: 8,
-                      fontSize: 13,
                     }}
-                    labelStyle={{ color: "var(--text2)" }}
-                    itemStyle={{ color: "var(--accent)" }}
                     formatter={tooltipFormatter}
                   />
 
