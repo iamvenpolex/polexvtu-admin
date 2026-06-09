@@ -9,10 +9,11 @@ import {
 } from "@/lib/services";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
-import { Save, RefreshCw, Search } from "lucide-react";
+import { Save, RefreshCw, Search, Trash2, RotateCcw } from "lucide-react";
 import { fmt } from "@/lib/utils";
 
-const MIN_MARGIN = 5; // mirrors backend floor
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+const MIN_MARGIN = 5;
 
 const PRODUCT_TYPES = [
   { key: "mtn_sme", label: "MTN SME" },
@@ -33,14 +34,14 @@ const PRODUCT_TYPES = [
 interface Plan {
   plan_id: string;
   name: string;
-  price: number; // EA provider price
+  price: number;
   validity: string;
-  markup: number; // current markup (from DB or global)
-  custom_price: number; // computed final = price + markup
+  markup: number;
+  custom_price: number;
 }
 
 interface PlanRow extends Plan {
-  localMarkup: string; // what admin typed in the input
+  localMarkup: string;
 }
 
 export default function DataPricingPage() {
@@ -51,24 +52,46 @@ export default function DataPricingPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Global markup state
+  // Global markup
   const [globalMarkup, setGlobalMarkupVal] = useState<number>(0);
   const [globalInput, setGlobalInput] = useState<string>("0");
   const [savingGlobal, setSavingGlobal] = useState(false);
 
-  // Load global markup once on mount
+  // Sync / delete state
+  const [hasPlans, setHasPlans] = useState<boolean | null>(null);
+  const [totalPlans, setTotalPlans] = useState(0);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [syncSummary, setSyncSummary] = useState<Record<
+    string,
+    { synced: number; error?: string }
+  > | null>(null);
+
+  // ── Check DB status ──────────────────────────────────────
+  async function checkStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/plans/status`);
+      const data = await res.json();
+      setHasPlans(data.hasPlans);
+      setTotalPlans(data.total);
+    } catch {
+      setHasPlans(false);
+    }
+  }
+
   useEffect(() => {
+    checkStatus();
     getGlobalMarkup()
       .then((res) => {
         const m = Number(res.data.markup || 0);
         setGlobalMarkupVal(m);
         setGlobalInput(String(m));
       })
-      .catch(() => {
-        /* non-critical */
-      });
+      .catch(() => {});
   }, []);
 
+  // ── Load plans ───────────────────────────────────────────
   const load = async (pt: string) => {
     setLoading(true);
     try {
@@ -91,7 +114,67 @@ export default function DataPricingPage() {
     load(productType);
   }, [productType]); // eslint-disable-line
 
-  // Live-preview: compute final price from localMarkup input
+  // ── Sync all ─────────────────────────────────────────────
+  async function handleSync() {
+    if (hasPlans) return;
+    setSyncing(true);
+    setSyncSummary(null);
+    try {
+      const res = await fetch(`${API_BASE}/admin/plans/sync`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHasPlans(data.total > 0);
+        setTotalPlans(data.total);
+        setSyncSummary(data.summary);
+        setLastSynced(new Date(data.synced_at).toLocaleString());
+        toast(
+          `Synced ${data.total} plans — all inactive, activate before users can buy`,
+        );
+        load(productType);
+      } else {
+        toast(data.message || "Sync failed", "error");
+      }
+    } catch {
+      toast("Network error — sync failed", "error");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // ── Delete all ───────────────────────────────────────────
+  async function handleDeleteAll() {
+    if (!hasPlans) return;
+    if (
+      !confirm(
+        "Delete ALL data plans? Users cannot buy data until you sync again.",
+      )
+    )
+      return;
+    setDeleting(true);
+    setSyncSummary(null);
+    try {
+      const res = await fetch(`${API_BASE}/admin/plans/all`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHasPlans(false);
+        setTotalPlans(0);
+        setRows([]);
+        toast(data.message);
+      } else {
+        toast(data.message || "Delete failed", "error");
+      }
+    } catch {
+      toast("Network error — delete failed", "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  // ── Markup helpers ───────────────────────────────────────
   const computeFinal = (apiPrice: number, markupStr: string) => {
     const m = Number(markupStr) || 0;
     return Math.max(apiPrice + m, apiPrice + MIN_MARGIN);
@@ -103,7 +186,6 @@ export default function DataPricingPage() {
     );
   };
 
-  // Apply global markup to ALL rows that haven't been individually edited
   const applyGlobalToAll = () => {
     setRows((prev) => prev.map((r) => ({ ...r, localMarkup: globalInput })));
   };
@@ -137,7 +219,7 @@ export default function DataPricingPage() {
       }));
       await bulkSetDataPrices(productType, payload);
       toast("All markups saved successfully");
-      load(productType); // refresh to show computed prices from server
+      load(productType);
     } catch {
       toast("Failed to save markups", "error");
     } finally {
@@ -151,11 +233,216 @@ export default function DataPricingPage() {
     [rows, search],
   );
 
+  const isBusy = syncing || deleting;
+
   return (
     <AdminShell title="Data Prices">
       <ToastContainer toasts={toasts} />
 
-      {/* Product type tabs */}
+      {/* ── Sync / Delete Panel ───────────────────────────── */}
+      <div className="rule-box" style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          {/* Left: status + last synced */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "5px 12px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 600,
+                backgroundColor:
+                  hasPlans === null
+                    ? "var(--bg2)"
+                    : hasPlans
+                      ? "#e6f4ea"
+                      : "#fce8e6",
+                color:
+                  hasPlans === null
+                    ? "var(--text3)"
+                    : hasPlans
+                      ? "#1e7e34"
+                      : "#c0392b",
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  backgroundColor:
+                    hasPlans === null
+                      ? "var(--text3)"
+                      : hasPlans
+                        ? "#28a745"
+                        : "#e74c3c",
+                }}
+              />
+              {hasPlans === null
+                ? "Checking…"
+                : hasPlans
+                  ? `${totalPlans} plans in DB`
+                  : "DB is empty"}
+            </div>
+            {lastSynced && (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                Last synced: {lastSynced}
+              </span>
+            )}
+          </div>
+
+          {/* Right: action buttons */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* Fetch & Sync — only active when DB is empty */}
+            <button
+              className="btn-primary"
+              onClick={handleSync}
+              disabled={isBusy || hasPlans === null || hasPlans === true}
+              title={
+                hasPlans
+                  ? "Delete all plans first before syncing"
+                  : "Fetch fresh plans from provider"
+              }
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                opacity:
+                  isBusy || hasPlans === null || hasPlans === true ? 0.4 : 1,
+                cursor:
+                  isBusy || hasPlans === null || hasPlans === true
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {syncing ? <span className="spin" /> : <RotateCcw size={13} />}
+              {syncing ? "Syncing…" : "Fetch & Sync"}
+            </button>
+
+            {/* Delete All — only active when DB has plans */}
+            <button
+              className="btn-sm"
+              onClick={handleDeleteAll}
+              disabled={isBusy || hasPlans === null || hasPlans === false}
+              title={!hasPlans ? "Nothing to delete" : "Wipe all plans from DB"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                color:
+                  !isBusy && hasPlans ? "var(--danger, #e74c3c)" : undefined,
+                opacity:
+                  isBusy || hasPlans === null || hasPlans === false ? 0.4 : 1,
+                cursor:
+                  isBusy || hasPlans === null || hasPlans === false
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {deleting ? <span className="spin" /> : <Trash2 size={13} />}
+              {deleting ? "Deleting…" : "Delete All"}
+            </button>
+          </div>
+        </div>
+
+        {/* Helper hint */}
+        {hasPlans !== null && (
+          <p
+            style={{
+              fontSize: 12,
+              color: "var(--text3)",
+              margin: "10px 0 0 0",
+            }}
+          >
+            {hasPlans
+              ? "To sync fresh plans from provider — delete all first, then click Fetch & Sync."
+              : "DB is empty. Click Fetch & Sync to pull all plans from the provider."}
+          </p>
+        )}
+
+        {/* Sync summary (shown after a sync) */}
+        {syncSummary && (
+          <div
+            style={{
+              marginTop: 14,
+              padding: "12px 14px",
+              backgroundColor: "var(--bg2)",
+              borderRadius: 8,
+              border: "1px solid var(--border)",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text2)",
+                margin: "0 0 10px 0",
+              }}
+            >
+              Sync summary
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                marginBottom: 10,
+              }}
+            >
+              {Object.entries(syncSummary).map(([network, info]) => (
+                <div
+                  key={network}
+                  style={{
+                    fontSize: 12,
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: `1px solid ${info.error ? "#e74c3c" : "#28a745"}`,
+                    color: info.error ? "#e74c3c" : "#1e7e34",
+                    backgroundColor: info.error ? "#fce8e6" : "#e6f4ea",
+                  }}
+                >
+                  <strong>{network}</strong>:{" "}
+                  {info.error ? `❌ ${info.error}` : `✅ ${info.synced} plans`}
+                </div>
+              ))}
+            </div>
+            <p
+              style={{
+                fontSize: 12,
+                color: "#92400e",
+                backgroundColor: "#fffbeb",
+                border: "1px solid #fcd34d",
+                borderRadius: 6,
+                padding: "7px 10px",
+                margin: 0,
+              }}
+            >
+              ⚠️ All synced plans are <strong>inactive</strong>. Use Save All
+              below to set markups and activate them.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Product type tabs ─────────────────────────────── */}
       <div
         style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}
       >
@@ -173,7 +460,7 @@ export default function DataPricingPage() {
         ))}
       </div>
 
-      {/* Global markup box */}
+      {/* ── Global markup box ─────────────────────────────── */}
       <div className="rule-box" style={{ marginBottom: 20 }}>
         <div
           style={{
@@ -233,7 +520,7 @@ export default function DataPricingPage() {
         </div>
       </div>
 
-      {/* Table header */}
+      {/* ── Table header ──────────────────────────────────── */}
       <div
         style={{
           display: "flex",
@@ -293,7 +580,7 @@ export default function DataPricingPage() {
         </div>
       </div>
 
-      {/* Plans table */}
+      {/* ── Plans table ───────────────────────────────────── */}
       <div className="table-wrap">
         {loading ? (
           <div style={{ padding: 40, textAlign: "center" }}>
@@ -323,7 +610,6 @@ export default function DataPricingPage() {
 
                     return (
                       <tr key={r.plan_id}>
-                        {/* Name */}
                         <td style={{ fontWeight: 500 }}>
                           {r.name}
                           {changed && (
@@ -342,18 +628,12 @@ export default function DataPricingPage() {
                             </span>
                           )}
                         </td>
-
-                        {/* Validity */}
                         <td style={{ color: "var(--text2)", fontSize: 12 }}>
                           {r.validity || "—"}
                         </td>
-
-                        {/* Provider price */}
                         <td className="mono" style={{ color: "var(--text2)" }}>
                           {fmt(r.price)}
                         </td>
-
-                        {/* Markup input */}
                         <td>
                           <div
                             style={{
@@ -380,13 +660,9 @@ export default function DataPricingPage() {
                             />
                           </div>
                         </td>
-
-                        {/* Final price (live preview) */}
                         <td style={{ fontWeight: 600, color: "var(--accent)" }}>
                           {fmt(final)}
                         </td>
-
-                        {/* Profit */}
                         <td
                           style={{
                             fontSize: 13,
@@ -407,7 +683,9 @@ export default function DataPricingPage() {
                 ) : (
                   <tr>
                     <td colSpan={6} className="empty-state">
-                      No plans found
+                      {hasPlans === false
+                        ? "No plans in database — sync to fetch from provider."
+                        : "No plans found"}
                     </td>
                   </tr>
                 )}
@@ -417,7 +695,7 @@ export default function DataPricingPage() {
         )}
       </div>
 
-      {/* Legend */}
+      {/* ── Legend ────────────────────────────────────────── */}
       <div
         style={{
           marginTop: 14,
