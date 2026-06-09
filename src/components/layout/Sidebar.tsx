@@ -35,9 +35,11 @@ const navItems = [
 export function Sidebar({
   open,
   setOpen,
+  isMobile,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
+  isMobile: boolean;
 }) {
   const pathname = usePathname();
   const { logout } = useAuth();
@@ -46,8 +48,8 @@ export function Sidebar({
 
   return (
     <>
-      {/* OVERLAY */}
-      {open && (
+      {/* OVERLAY (MOBILE ONLY) */}
+      {isMobile && open && (
         <div
           onClick={close}
           style={{
@@ -62,15 +64,16 @@ export function Sidebar({
       <nav
         style={{
           width: 240,
-          minWidth: 240,
           background: "var(--surface)",
           borderRight: "1px solid var(--border)",
           display: "flex",
           flexDirection: "column",
           height: "100vh",
-          position: "fixed",
+
+          position: isMobile ? "fixed" : "fixed",
+          left: isMobile ? (open ? 0 : -240) : 0,
           top: 0,
-          left: open ? 0 : -240,
+
           zIndex: 1000,
           transition: "left .3s ease",
         }}
@@ -78,7 +81,7 @@ export function Sidebar({
         {/* HEADER */}
         <div
           style={{
-            padding: "20px 18px",
+            padding: "18px",
             display: "flex",
             alignItems: "center",
             borderBottom: "1px solid var(--border)",
@@ -92,18 +95,19 @@ export function Sidebar({
           <span style={{ marginLeft: 6, fontSize: 12, color: "var(--text3)" }}>
             Admin
           </span>
-          {/* CLOSE BUTTON */}
-          <button
-            onClick={close}
-            style={{
-              marginLeft: "auto",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            <X size={18} />
-          </button>
+          {isMobile && (
+            <button
+              onClick={close}
+              style={{
+                marginLeft: "auto",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         {/* NAV */}
@@ -111,23 +115,14 @@ export function Sidebar({
           {navItems.map((item, i) => {
             if ("section" in item) {
               return (
-                <div
-                  key={i}
-                  style={{
-                    padding: "14px 18px 4px",
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: "var(--text3)",
-                    textTransform: "uppercase",
-                  }}
-                >
+                <div key={i} style={{ padding: "14px 18px 4px", fontSize: 10 }}>
                   {item.section}
                 </div>
               );
             }
 
             const active =
-              pathname === item.href || pathname.startsWith(item.href + "/");
+              pathname === item.href || pathname.startsWith(item.href);
 
             const Icon = item.icon;
 
@@ -141,10 +136,9 @@ export function Sidebar({
                   alignItems: "center",
                   gap: 10,
                   padding: "10px 18px",
+                  textDecoration: "none",
                   color: active ? "var(--accent)" : "var(--text)",
                   background: active ? "rgba(0,0,0,0.05)" : "transparent",
-                  textDecoration: "none",
-                  fontSize: 14,
                 }}
               >
                 <Icon size={16} />
@@ -161,7 +155,6 @@ export function Sidebar({
             style={{
               width: "100%",
               display: "flex",
-              alignItems: "center",
               justifyContent: "center",
               gap: 8,
               padding: 10,

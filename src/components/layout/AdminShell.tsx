@@ -13,7 +13,9 @@ export function AdminShell({
   title: string;
 }) {
   const router = useRouter();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     import("js-cookie").then((Cookies) => {
@@ -23,10 +25,25 @@ export function AdminShell({
     });
   }, [router]);
 
+  // SAFE MOBILE DETECTION
+  useEffect(() => {
+    const check = () => {
+      setIsMobile(window.matchMedia("(max-width: 768px)").matches);
+    };
+
+    check();
+
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      {/* SIDEBAR CONTROLLED HERE */}
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <Sidebar
+        open={sidebarOpen}
+        setOpen={setSidebarOpen}
+        isMobile={isMobile}
+      />
 
       <div
         style={{
@@ -34,6 +51,7 @@ export function AdminShell({
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          marginLeft: isMobile ? 0 : 240, // ✅ KEY FIX
         }}
       >
         {/* TOPBAR */}
@@ -48,26 +66,21 @@ export function AdminShell({
             padding: "0 16px",
           }}
         >
-          {/* ☰ BUTTON */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            <Menu size={22} />
-          </button>
+          {/* MOBILE MENU BUTTON */}
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <Menu size={22} />
+            </button>
+          )}
 
-          <div
-            style={{
-              fontFamily: "Syne, sans-serif",
-              fontWeight: 700,
-            }}
-          >
-            {title}
-          </div>
+          <div style={{ fontFamily: "Syne", fontWeight: 700 }}>{title}</div>
 
           <div style={{ fontSize: 12, color: "var(--text3)" }}>
             {new Date().toLocaleDateString("en-NG", {
