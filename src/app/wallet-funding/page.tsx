@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
 import { fmt } from "@/lib/utils";
-import { Search, Wallet, RotateCcw, X } from "lucide-react";
+import { Search, Wallet, X } from "lucide-react";
 
 interface User {
   id: number;
@@ -18,27 +18,14 @@ interface User {
   deleted: boolean;
 }
 
-type ActionType = "fund" | "refund";
-
-interface ModalState {
-  open: boolean;
-  type: ActionType;
-  user: User | null;
-}
-
 export default function WalletFundingPage() {
   const { toasts, toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState<ModalState>({
-    open: false,
-    type: "fund",
-    user: null,
-  });
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [txnId, setTxnId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -55,51 +42,56 @@ export default function WalletFundingPage() {
       .includes(q);
   });
 
-  const openModal = (type: ActionType, user: User) => {
-    setModal({ open: true, type, user });
+  const openModal = (user: User) => {
+    setSelectedUser(user);
     setAmount("");
     setNote("");
-    setTxnId("");
   };
 
   const closeModal = () => {
-    setModal({ open: false, type: "fund", user: null });
+    setSelectedUser(null);
+    setAmount("");
+    setNote("");
   };
 
+  const numAmount = Number(amount);
+  const isDeposit = numAmount > 0;
+  const isDebit = numAmount < 0;
+  const absAmount = Math.abs(numAmount);
+  const balanceAfter = selectedUser
+    ? Number(selectedUser.balance) + numAmount
+    : 0;
+
   const handleSubmit = async () => {
-    if (!modal.user) return;
-    const amt = Number(amount);
-    if (!amt || amt <= 0) {
-      toast("Enter a valid amount", "error");
+    if (!selectedUser) return;
+    if (!amount || isNaN(numAmount) || numAmount === 0) {
+      toast(
+        "Enter a valid amount (positive to deposit, negative to debit)",
+        "error",
+      );
+      return;
+    }
+    if (balanceAfter < 0) {
+      toast(
+        `Cannot deduct — user only has ${fmt(selectedUser.balance)}`,
+        "error",
+      );
       return;
     }
 
     setSubmitting(true);
     try {
-      const endpoint =
-        modal.type === "fund"
-          ? "/api/admin/wallet/fund"
-          : "/api/admin/wallet/refund";
-
-      const payload: Record<string, unknown> = {
-        user_id: modal.user.id,
-        amount: amt,
+      const res = await api.post("/api/admin/wallet/fund", {
+        user_id: selectedUser.id,
+        amount: numAmount,
         note: note || undefined,
-      };
-      if (modal.type === "refund" && txnId) {
-        payload.transaction_id = Number(txnId);
-      }
+      });
 
-      const res = await api.post(endpoint, payload);
+      toast(res.data.message);
 
-      toast(
-        `${modal.type === "fund" ? "Funded" : "Refunded"} ${fmt(amt)} → ${modal.user.first_name} ${modal.user.last_name}`,
-      );
-
-      // Update balance in local state
       setUsers((prev) =>
         prev.map((u) =>
-          u.id === modal.user!.id
+          u.id === selectedUser.id
             ? { ...u, balance: res.data.balance_after }
             : u,
         ),
@@ -116,10 +108,9 @@ export default function WalletFundingPage() {
   };
 
   return (
-    <AdminShell title="Wallet Funding">
+    <AdminShell title="Fund / Debit Wallet">
       <ToastContainer toasts={toasts} />
 
-      {/* Summary */}
       <div
         style={{
           display: "grid",
@@ -142,7 +133,6 @@ export default function WalletFundingPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="table-wrap">
         <div
           style={{
@@ -192,7 +182,7 @@ export default function WalletFundingPage() {
                   <th>Email</th>
                   <th>Phone</th>
                   <th>Balance</th>
-                  <th>Actions</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,32 +198,19 @@ export default function WalletFundingPage() {
                         {fmt(u.balance)}
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button
-                            className="btn-sm btn-success"
-                            onClick={() => openModal("fund", u)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                            }}
-                          >
-                            <Wallet size={12} /> Fund
-                          </button>
-                          <button
-                            className="btn-sm"
-                            onClick={() => openModal("refund", u)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                              borderColor: "#3b82f640",
-                              color: "var(--info)",
-                            }}
-                          >
-                            <RotateCcw size={12} /> Refund
-                          </button>
-                        </div>
+                        <button
+                          className="btn-sm"
+                          onClick={() => openModal(u)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            borderColor: "#f9731640",
+                            color: "var(--accent)",
+                          }}
+                        >
+                          <Wallet size={12} /> Fund / Debit
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -250,26 +227,17 @@ export default function WalletFundingPage() {
         )}
       </div>
 
-      {/* Modal */}
-      {modal.open && modal.user && (
+      {selectedUser && (
         <div
           className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeModal();
           }}
         >
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-title">
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {modal.type === "fund" ? (
-                  <>
-                    <Wallet size={18} color="var(--success)" /> Fund Wallet
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw size={18} color="var(--info)" /> Issue Refund
-                  </>
-                )}
+                <Wallet size={18} color="var(--accent)" /> Fund / Debit Wallet
               </div>
               <button
                 onClick={closeModal}
@@ -284,28 +252,27 @@ export default function WalletFundingPage() {
               </button>
             </div>
 
-            {/* User info */}
             <div
               style={{
                 background: "var(--surface2)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: "12px 14px",
-                marginBottom: 16,
+                marginBottom: 20,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
               }}
             >
               <div>
-                <div style={{ fontWeight: 500 }}>
-                  {modal.user.first_name} {modal.user.last_name}
+                <div style={{ fontWeight: 600 }}>
+                  {selectedUser.first_name} {selectedUser.last_name}
                 </div>
                 <div
                   className="mono"
                   style={{ fontSize: 12, color: "var(--text3)" }}
                 >
-                  {modal.user.email}
+                  {selectedUser.email}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -317,89 +284,115 @@ export default function WalletFundingPage() {
                     fontWeight: 700,
                     color: "var(--success)",
                     fontFamily: "Syne, sans-serif",
-                    fontSize: 18,
+                    fontSize: 20,
                   }}
                 >
-                  {fmt(modal.user.balance)}
+                  {fmt(selectedUser.balance)}
                 </div>
               </div>
             </div>
 
-            {/* Amount */}
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 6 }}>
               <label className="form-label">
-                Amount (₦) <span style={{ color: "var(--danger)" }}>*</span>
+                Amount (₦) — positive to deposit, negative to debit
               </label>
               <input
                 className="form-input"
                 type="number"
-                min="1"
-                placeholder="e.g. 5000"
+                placeholder="e.g. 500 or -200"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                autoFocus
               />
-              {amount && Number(amount) > 0 && (
-                <div
-                  style={{ fontSize: 12, color: "var(--text3)", marginTop: 5 }}
-                >
-                  Balance after:{" "}
-                  <strong style={{ color: "var(--success)" }}>
-                    {fmt(Number(modal.user.balance) + Number(amount))}
-                  </strong>
-                </div>
-              )}
             </div>
 
-            {/* Transaction ID (refund only) */}
-            {modal.type === "refund" && (
-              <div style={{ marginBottom: 14 }}>
-                <label className="form-label">Transaction ID (optional)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  placeholder="Links refund to a specific transaction"
-                  value={txnId}
-                  onChange={(e) => setTxnId(e.target.value)}
-                />
+            {amount && !isNaN(numAmount) && numAmount !== 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  background: isDeposit ? "#22c55e0f" : "#ef44440f",
+                  border: `1px solid ${isDeposit ? "#22c55e25" : "#ef444425"}`,
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  marginBottom: 14,
+                }}
+              >
+                <div style={{ fontSize: 12 }}>
+                  <span style={{ color: "var(--text3)" }}>Type: </span>
+                  <strong
+                    style={{
+                      color: isDeposit ? "var(--success)" : "var(--danger)",
+                    }}
+                  >
+                    {isDeposit ? "Deposit" : "Debit"}
+                  </strong>
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  <span style={{ color: "var(--text3)" }}>Amount: </span>
+                  <strong>{fmt(absAmount)}</strong>
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  <span style={{ color: "var(--text3)" }}>Balance after: </span>
+                  <strong
+                    style={{
+                      color:
+                        balanceAfter < 0 ? "var(--danger)" : "var(--success)",
+                    }}
+                  >
+                    {fmt(balanceAfter)}
+                  </strong>
+                  {balanceAfter < 0 && (
+                    <span
+                      style={{
+                        color: "var(--danger)",
+                        marginLeft: 6,
+                        fontSize: 11,
+                      }}
+                    >
+                      ⚠ insufficient
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Note */}
             <div style={{ marginBottom: 20 }}>
-              <label className="form-label">Note (optional)</label>
+              <label className="form-label">
+                Note (optional — shown in user history)
+              </label>
               <input
                 className="form-input"
                 placeholder={
-                  modal.type === "fund"
-                    ? "e.g. Bonus credit, correction..."
-                    : "e.g. Failed transaction refund..."
+                  isDebit
+                    ? "e.g. Erroneous credit reversal"
+                    : "e.g. Bonus credit, correction..."
                 }
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
             </div>
 
-            {/* What will show on user history */}
             <div
               style={{
-                background: modal.type === "fund" ? "#22c55e0f" : "#3b82f60f",
-                border: `1px solid ${modal.type === "fund" ? "#22c55e25" : "#3b82f625"}`,
-                borderRadius: 8,
-                padding: "10px 14px",
-                marginBottom: 20,
                 fontSize: 12,
-                color: "var(--text2)",
+                color: "var(--text3)",
+                marginBottom: 20,
+                padding: "8px 12px",
+                background: "var(--surface2)",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
               }}
             >
-              This will appear on the user&apos;s history as{" "}
+              This will appear on the user&apos;s transaction history as{" "}
               <strong
                 style={{
-                  color:
-                    modal.type === "fund" ? "var(--success)" : "var(--info)",
+                  color: isDeposit ? "var(--success)" : "var(--danger)",
                 }}
               >
-                &quot;{modal.type === "fund" ? "Manual Funding" : "Refund"}
-                &quot;
+                &quot;{isDeposit ? "Deposit" : isDebit ? "Debit" : "—"}&quot;
               </strong>
             </div>
 
@@ -412,27 +405,32 @@ export default function WalletFundingPage() {
               <button
                 className="btn-primary"
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={
+                  submitting ||
+                  !amount ||
+                  isNaN(numAmount) ||
+                  numAmount === 0 ||
+                  balanceAfter < 0
+                }
                 style={{
-                  background:
-                    modal.type === "fund" ? "var(--success)" : "var(--info)",
+                  background: isDeposit
+                    ? "var(--success)"
+                    : isDebit
+                      ? "var(--danger)"
+                      : "var(--accent)",
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
                 }}
               >
-                {submitting ? (
-                  <span className="spin" />
-                ) : modal.type === "fund" ? (
-                  <Wallet size={14} />
-                ) : (
-                  <RotateCcw size={14} />
-                )}
+                {submitting ? <span className="spin" /> : <Wallet size={14} />}
                 {submitting
                   ? "Processing…"
-                  : modal.type === "fund"
-                    ? "Fund Wallet"
-                    : "Issue Refund"}
+                  : isDeposit
+                    ? "Deposit"
+                    : isDebit
+                      ? "Debit"
+                      : "Submit"}
               </button>
             </div>
           </div>

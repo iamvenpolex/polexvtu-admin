@@ -14,12 +14,19 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Users, ArrowLeftRight, TrendingUp, CreditCard } from "lucide-react";
+import {
+  Users,
+  ArrowLeftRight,
+  TrendingUp,
+  CreditCard,
+  Wallet,
+} from "lucide-react";
 
 interface Overview {
   users: number;
   transactions: number;
   revenue: number;
+  wallet_balance: number;
 }
 
 interface IncomeData {
@@ -38,16 +45,13 @@ export default function DashboardPage() {
   const [range, setRange] = useState<Range>("day");
   const [loading, setLoading] = useState(false);
 
-  // ✅ SAFE MOBILE DETECTION (NO WINDOW DURING BUILD)
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const check = () => {
       setIsMobile(window.matchMedia("(max-width: 768px)").matches);
     };
-
     check();
-
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
@@ -57,25 +61,19 @@ export default function DashboardPage() {
 
     const loadData = async () => {
       setLoading(true);
-
       try {
         const [ov, inc] = await Promise.all([getOverview(), getIncome(range)]);
-
         if (!isMounted) return;
-
         setOverview(ov.data);
         setIncome(inc.data);
       } catch {
-        if (isMounted) {
-          toast("Failed to load analytics", "error");
-        }
+        if (isMounted) toast("Failed to load analytics", "error");
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
     loadData();
-
     return () => {
       isMounted = false;
     };
@@ -114,6 +112,12 @@ export default function DashboardPage() {
       icon: CreditCard,
       color: "var(--warning)",
     },
+    {
+      label: "Users Wallet Total",
+      value: overview ? fmt(overview.wallet_balance) : "—",
+      icon: Wallet,
+      color: "#a78bfa", // purple
+    },
   ];
 
   const tooltipFormatter = (value: unknown): [string, string] => {
@@ -145,7 +149,7 @@ export default function DashboardPage() {
               display: "grid",
               gridTemplateColumns: isMobile
                 ? "repeat(2,1fr)"
-                : "repeat(auto-fit,minmax(180px,1fr))",
+                : "repeat(auto-fit,minmax(160px,1fr))",
               gap: isMobile ? 10 : 14,
               marginBottom: isMobile ? 18 : 28,
             }}
@@ -162,7 +166,6 @@ export default function DashboardPage() {
                   <div className="stat-label">{s.label}</div>
                   <s.icon size={18} color={s.color} />
                 </div>
-
                 <div className="stat-value" style={{ color: s.color }}>
                   {s.value}
                 </div>
@@ -179,7 +182,6 @@ export default function DashboardPage() {
               padding: isMobile ? 14 : "20px 24px",
             }}
           >
-            {/* HEADER */}
             <div
               style={{
                 display: "flex",
@@ -190,7 +192,6 @@ export default function DashboardPage() {
               }}
             >
               <div className="section-title">Income Overview</div>
-
               <div
                 style={{
                   display: "flex",
@@ -214,7 +215,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* CHART */}
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={isMobile ? 320 : 260}>
                 <AreaChart data={chartData}>
@@ -228,7 +228,6 @@ export default function DashboardPage() {
                       <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-
                   <XAxis
                     dataKey="label"
                     tick={{
@@ -238,7 +237,6 @@ export default function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                   />
-
                   <YAxis
                     tick={{
                       fill: "var(--text3)",
@@ -248,7 +246,6 @@ export default function DashboardPage() {
                     tickLine={false}
                     tickFormatter={(v) => "₦" + Number(v).toLocaleString()}
                   />
-
                   <Tooltip
                     contentStyle={{
                       background: "var(--surface2)",
@@ -260,7 +257,6 @@ export default function DashboardPage() {
                     itemStyle={{ color: "var(--accent)" }}
                     formatter={tooltipFormatter}
                   />
-
                   <Area
                     type="monotone"
                     dataKey="amount"
